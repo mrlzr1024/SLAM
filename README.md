@@ -13,4 +13,7 @@ ROS2 功能包
   
   test05 -------- 结合激光雷达的ICP算法 
    + Icp.py -------- ROS2下，用ICP解决纯激光定位问题(真机)
+   + icp02.py ------- ROS2下，激光+IMU 里程计 (真机)
+   + test03.py ------ dronekit 读取PX4基本数据
+   
  
