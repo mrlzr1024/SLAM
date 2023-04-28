@@ -2,17 +2,11 @@
 
 
 '''
-### 警告：雷达话题已经改为 myscan !!!!!!!!
-
     [icp]
     小车
     更换IMU、激光雷达
     激光+IMU 里程计
-    发布： 
-        1.小车全局坐标
-        2.小车相对坐标
-    与test03.py 结合控制小车
-
+    发布
 '''
 from cmath import pi
 import rclpy
@@ -22,8 +16,6 @@ from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan
 from sensor_msgs.msg import Imu 
 from std_msgs.msg import Float64MultiArray, Float32
-from geometry_msgs.msg import Twist 
-import math
 import numpy as np
 import math
 import cv2 as cv
@@ -40,8 +32,9 @@ class NodeSubscribe02(Node):
     begin_xy_msg = np.zeros((720, 2))
     now_statue = [0,0,0,0]
     now_statue2 = [0,0]
-    points=[[0.9,0.9]] # 设置的点集
-    Car_statue=[0,0]
+    
+
+    # vehicle = connect("/dev/myusb0", baud=115200, wait_ready=True)
 
     def __init__(self, name):
         super().__init__(name)
@@ -50,16 +43,15 @@ class NodeSubscribe02(Node):
         self.get_logger().info("我是%s test05!" % name)
         # 创建订阅者
         self.command_subscribe_ = self.create_subscription(
-            LaserScan, "myscan", self.command_callback, qos_profile_sensor_data)
+            LaserScan, "scan", self.command_callback, qos_profile_sensor_data)
         # self.submoney = self.create_subscription(
         #     Imu, "imu/data_raw", self.recv_money_callback, qos_profile_sensor_data)
         self.submoney = self.create_subscription(
             Float32, "Test01", self.recv_money_callback, 10)
 
-        self.pub_novel1 = self.create_publisher(Float64MultiArray,"my_odom", 10)
-        self.pub_novel2 = self.create_publisher(Float64MultiArray,"car_odom", 10) 
-        
+        self.pub_novel = self.create_publisher(Float64MultiArray,"my_odom", 10) 
 
+        
     def recv_money_callback(self, imuData):
         """
         4. 编写订阅回调处理逻辑
@@ -75,59 +67,42 @@ class NodeSubscribe02(Node):
         
     def command_callback(self, msg):
         send_msg = Float64MultiArray(data = [0,0,0])
-        car_msg= Float64MultiArray(data = [0,0])
         j=0
         x=[0 ,180,90,270]
         x[0] +=round(self.imu_yaw  - self.theta_0)
         x[1] = x[0]+180
         x[2] = x[0]+90
         x[3] = x[0]+270
+
+
         for i in range(4):
             if x[i] <0 :
                 x[i]+=360
             elif x[i] >360:
                 x[i] -=360
+        # print(x)
         for i in range(len(msg.ranges)):
             if msg.ranges[i]*msg.intensities[i] != 0:
                 for io in range(4):
                     if round(j*180/pi) == x[io] :
                         self.now_statue[io] = msg.ranges[i]
+                        # print (f" [{round(j*180/pi)}],dist = {msg.ranges[i]}")
                 j+=msg.angle_increment
+        # print(self.now_statue)
         self.now_statue2[0] = round(self.now_statue[0],2)
         self.now_statue2[1] = round(self.now_statue[3],2)
         send_msg.data[0] = self.now_statue2 [0]
         send_msg.data[1] = self.now_statue2 [1]
         send_msg.data[2] = round(self.imu_yaw  - self.theta_0)
-        self.pub_novel1.publish(send_msg) 
-        self.Car_odom(self.points[0])
-        car_msg.data[0] = self.Car_statue[0]
-        car_msg.data[1] = self.Car_statue[1]
-        print(f"{self.now_statue2} x_y=[{round(car_msg.data[0],2)},{round(car_msg.data[1] ,2)}]")
-        self.pub_novel2.publish(car_msg) 
-
-    
-    def Car_odom(self,point):
-        theta = round(self.imu_yaw  - self.theta_0)/180*pi
-        # R = np.array([
-        #             [np.cos(theta),-np.sin(theta)],
-        #             [np.sin(theta),np.cos(theta)]]
-        #             )
-        R = np.array([[math.cos(theta), math.sin(theta)],
-                    [-math.sin(theta), math.cos(theta)]])  # 旋转矩阵
-        T = np.array([self.now_statue2 [0],self.now_statue2 [1]])
-        tmp = point - T
-        tmp1 = np.matmul(R,tmp)
-        self.Car_statue[0]  = tmp1 [0]
-        self.Car_statue[1]  = tmp1 [1]
-        
-        return [round(tmp1[0],2),round(tmp1[1],2)]
+        self.pub_novel.publish(send_msg) 
+        print(f"{self.now_statue2} x_l={round(self.now_statue[0]+self.now_statue[1],2)}  y_l={round(self.now_statue[2]+self.now_statue[3],2)}")
 
 
 def main(args=None):
-    rclpy.init(args=args)  
-    node = NodeSubscribe02("scan2")  
+    rclpy.init(args=args)  # 初始化rclpy
+    node = NodeSubscribe02("scan2")  # 新建一个节点
     print("ok!!!")
-    rclpy.spin(node)  
-    
-    rclpy.shutdown()  
+    rclpy.spin(node)  # 保持节点运行，检测是否收到退出指令（Ctrl+C）
+    # node.vehicle.close()
+    rclpy.shutdown()  # 关闭rclpy
     print("Completed")

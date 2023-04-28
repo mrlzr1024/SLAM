@@ -1,0 +1,2 @@
+docker run -it --rm -v /dev:/dev -v /dev/shm:/dev/shm --privileged --net=host microros/micro-ros-agent:$ROS_DISTRO udp4 --port 8888 -v6
+ros2 run turtlesim turtle_teleop_key

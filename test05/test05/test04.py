@@ -2,17 +2,14 @@
 
 
 '''
-### 警告：雷达话题已经改为 myscan !!!!!!!!
-
     [icp]
     小车
     更换IMU、激光雷达
     激光+IMU 里程计
     发布： 
         1.小车全局坐标
-        2.小车相对坐标
-    与test03.py 结合控制小车
-
+    通过计算局部坐标
+    动态控制小车
 '''
 from cmath import pi
 import rclpy
@@ -40,7 +37,7 @@ class NodeSubscribe02(Node):
     begin_xy_msg = np.zeros((720, 2))
     now_statue = [0,0,0,0]
     now_statue2 = [0,0]
-    points=[[0.9,0.9]] # 设置的点集
+    points=[[0.9,0.9]]
     Car_statue=[0,0]
 
     def __init__(self, name):
@@ -57,8 +54,25 @@ class NodeSubscribe02(Node):
             Float32, "Test01", self.recv_money_callback, 10)
 
         self.pub_novel1 = self.create_publisher(Float64MultiArray,"my_odom", 10)
-        self.pub_novel2 = self.create_publisher(Float64MultiArray,"car_odom", 10) 
+        self.pub_novel3 = self.create_publisher(Twist,"turtle1/cmd_vel", 10) 
+        timer_period = 0.05
+        self.timer = self.create_timer(timer_period, self.timer_callback)  
         
+    
+    def timer_callback(self):
+        msg = Twist()
+        if self.Car_statue[0] > 0.05:
+            msg.linear.x = self.Car_statue[0]
+            # print("f")
+        elif self.Car_statue[0] < -0.05:
+            msg.linear.x = self.Car_statue[0]
+        elif self.Car_statue[1] >0.05:
+            msg.linear.z = -self.Car_statue[1]
+        elif self.Car_statue[1] <-0.05:
+            msg.linear.z = -self.Car_statue[1]
+        self.pub_novel3.publish(msg) 
+        
+
 
     def recv_money_callback(self, imuData):
         """
@@ -75,7 +89,6 @@ class NodeSubscribe02(Node):
         
     def command_callback(self, msg):
         send_msg = Float64MultiArray(data = [0,0,0])
-        car_msg= Float64MultiArray(data = [0,0])
         j=0
         x=[0 ,180,90,270]
         x[0] +=round(self.imu_yaw  - self.theta_0)
@@ -98,13 +111,9 @@ class NodeSubscribe02(Node):
         send_msg.data[0] = self.now_statue2 [0]
         send_msg.data[1] = self.now_statue2 [1]
         send_msg.data[2] = round(self.imu_yaw  - self.theta_0)
-        self.pub_novel1.publish(send_msg) 
+        self.pub_novel1.publish(send_msg) # 全局坐标
         self.Car_odom(self.points[0])
-        car_msg.data[0] = self.Car_statue[0]
-        car_msg.data[1] = self.Car_statue[1]
-        print(f"{self.now_statue2} x_y=[{round(car_msg.data[0],2)},{round(car_msg.data[1] ,2)}]")
-        self.pub_novel2.publish(car_msg) 
-
+        print(f"{self.now_statue2} x_y=[{round(self.Car_statue[0],2)},{round(self.Car_statue[1] ,2)}]")
     
     def Car_odom(self,point):
         theta = round(self.imu_yaw  - self.theta_0)/180*pi
@@ -119,7 +128,6 @@ class NodeSubscribe02(Node):
         tmp1 = np.matmul(R,tmp)
         self.Car_statue[0]  = tmp1 [0]
         self.Car_statue[1]  = tmp1 [1]
-        
         return [round(tmp1[0],2),round(tmp1[1],2)]
 
 
